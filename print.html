@@ -3915,7 +3915,7 @@ auto cloneOfP(p);       //用左值初始化
 <li><strong>是否是个引用</strong>。对于决定是否通用引用构造函数启用的目的来说，<code>Person</code>，<code>Person&amp;</code>，<code>Person&amp;&amp;</code>都是跟<code>Person</code>一样的。</li>
 <li><strong>是不是<code>const</code>或者<code>volatile</code></strong>。如上所述，<code>const Person</code>，<code>volatile Person</code> ，<code>const volatile Person</code>也是跟<code>Person</code>一样的。</li>
 </ul>
-<p>这意味着我们需要一种方法消除对于<code>T</code>的引用，<code>const</code>，<code>volatile</code>修饰。再次，标准库提供了这样功能的<em>type trait</em>，就是<code>std::decay</code>。<code>std::decay&lt;T&gt;::value</code>与<code>T</code>是相同的，只不过会移除引用和cv限定符（<em>cv-qualifiers</em>，即<code>const</code>或<code>volatile</code>标识符）的修饰。（这里我没有说出另外的真相，<code>std::decay</code>如同其名一样，可以将数组或者函数退化成指针，参考<a href="5.RRefMovSemPerfForw/../1.DeducingTypes/item1.html">Item1</a>，但是在这里讨论的问题中，它刚好合适）。我们想要控制构造函数是否启用的条件可以写成：</p>
+<p>这意味着我们需要一种方法消除对于<code>T</code>的引用，<code>const</code>，<code>volatile</code>修饰。再次，标准库提供了这样功能的<em>type trait</em>，就是<code>std::decay</code>。<code>std::decay&lt;T&gt;::type</code>与<code>T</code>是相同的，只不过会移除引用和cv限定符（<em>cv-qualifiers</em>，即<code>const</code>或<code>volatile</code>标识符）的修饰。（这里我没有说出另外的真相，<code>std::decay</code>如同其名一样，可以将数组或者函数退化成指针，参考<a href="5.RRefMovSemPerfForw/../1.DeducingTypes/item1.html">Item1</a>，但是在这里讨论的问题中，它刚好合适）。我们想要控制构造函数是否启用的条件可以写成：</p>
 <pre><code class="language-cpp">!std::is_same&lt;Person, typename std::decay&lt;T&gt;::type&gt;::value
 </code></pre>
 <p>即<code>Person</code>和<code>T</code>的类型不同，忽略了所有引用和cv限定符。（如<a href="5.RRefMovSemPerfForw/../3.MovingToModernCpp/item9.html">Item9</a>所述，<code>std::decay</code>前的“<code>typename</code>”是必需的，因为<code>std::decay&lt;T&gt;::type</code>的类型取决于模板形参<code>T</code>。）</p>
@@ -4203,13 +4203,13 @@ public:
 <p>让我们从已知很多类型不支持移动操作开始这个过程。为了升级到C++11，C++98的很多标准库做了大修改，为很多类型提供了移动的能力，这些类型的移动实现比复制操作更快，并且对库的组件实现修改以利用移动操作。但是很有可能你工作中的代码没有完整地利用C++11。对于你的应用中（或者代码库中）的类型，没有适配C++11的部分，编译器即使支持移动语义也是无能为力的。的确，C++11倾向于为缺少移动操作的类生成它们，但是只有在没有声明复制操作，移动操作，或析构函数的类中才会生成移动操作（参考<a href="5.RRefMovSemPerfForw/../3.MovingToModernCpp/item17.html">Item17</a>）。数据成员或者某类型的基类禁止移动操作（比如通过delete移动操作，参考<a href="5.RRefMovSemPerfForw/../3.MovingToModernCpp/item11.html">Item11</a>），编译器不生成移动操作的支持。对于没有明确支持移动操作的类型，并且不符合编译器默认生成的条件的类，没有理由期望C++11会比C++98进行任何性能上的提升。</p>
 <p>即使显式支持了移动操作，结果可能也没有你希望的那么好。比如，所有C++11的标准库容器都支持了移动操作，但是认为移动所有容器的开销都非常小是个错误。对于某些容器来说，压根就不存在开销小的方式来移动它所包含的内容。对另一些容器来说，容器的开销真正小的移动操作会有些容器元素不能满足的注意条件。</p>
 <p>考虑一下<code>std::array</code>，这是C++11中的新容器。<code>std::array</code>本质上是具有STL接口的内置数组。这与其他标准容器将内容存储在堆内存不同。存储具体数据在堆内存的容器，本身只保存了指向堆内存中容器内容的指针（真正实现当然更复杂一些，但是基本逻辑就是这样）。这个指针的存在使得在常数时间移动整个容器成为可能，只需要从源容器拷贝保存指向容器内容的指针到目标容器，然后将源指针置为空指针就可以了：</p>
-<pre><code class="language-cpp">std::vector&lt;Widget&gt; vm1;
+<pre><code class="language-cpp">std::vector&lt;Widget&gt; vw1;
 
 //把数据存进vw1
 …
 
 //把vw1移动到vw2。以常数时间运行。只有vw1和vw2中的指针被改变
-auto vm2 = std::move(vm1);
+auto vw2 = std::move(vw1);
 </code></pre>
 <p><img src="5.RRefMovSemPerfForw/media/item29_fig1.png" alt="item29_fig1" /></p>
 <p><code>std::array</code>没有这种指针实现，数据就保存在<code>std::array</code>对象中：</p>
